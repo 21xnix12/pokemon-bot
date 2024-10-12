@@ -1,0 +1,91 @@
+import discord
+from discord.ext import commands
+import os, random
+import requests
+
+# Intencje bota
+intents = discord.Intents.default()
+intents.message_content = True
+bot = commands.Bot(command_prefix='!', intents=intents)
+
+# URL do PokeAPI, który zwraca dane o Pokémonach
+POKEMON_API_URL = "https://pokeapi.co/api/v2/pokemon/"
+
+# Funkcja do pobierania losowego obrazka Pokémona
+def get_random_pokemon_image():
+    pokemon_id = random.randint(1, 1010)  # Zakres ID dla Pokémonów (1-1010)
+    
+    # Wysyłamy zapytanie do PokeAPI, aby uzyskać dane Pokémona
+    response = requests.get(f"{POKEMON_API_URL}{pokemon_id}")
+    
+    if response.status_code == 200:
+        data = response.json()
+        # Pobieramy URL do oficjalnego artworku Pokémona
+        pokemon_image_url = data["sprites"]["other"]["official-artwork"]["front_default"]
+        pokemon_name = data["name"].capitalize()
+        return pokemon_name, pokemon_image_url
+    else:
+        return None, None
+
+# Komenda, która wysyła losowy obrazek Pokémona
+@bot.command()
+async def pokemon(ctx):
+    pokemon_name, image_url = get_random_pokemon_image()
+    
+    if image_url:
+        embed = discord.Embed(title=f"Losowy Pokémon: {pokemon_name}")
+        embed.set_image(url=image_url)
+        await ctx.send(embed=embed)
+    else:
+        await ctx.send("Nie udało się znaleźć obrazka Pokémona. Spróbuj ponownie!")
+
+# Losowy fakt o grach Pokémon
+game_facts = [
+    "W Pokémon Red/Blue, MissingNo. to słynny błąd gry, który można było spotkać, przeglądając błędnie dane Pokédexu.",
+    "W Pokémon Gold/Silver, gracz może wrócić do regionu Kanto po pokonaniu Elitarnej Czwórki w regionie Johto.",
+    # Dodaj więcej faktów tutaj...
+]
+
+# Komenda '!pokefact', która wysyła losowy fakt o grach Pokémon
+@bot.command()
+async def pokefact(ctx):
+    fact = random.choice(game_facts)
+    await ctx.send(fact)
+
+# URL do API Pokedexu
+POKEDEX_API_URL = "https://pokeapi.co/api/v2/pokemon-species/"
+
+# Funkcja do pobierania wpisu z Pokédexu
+def get_pokedex_entry(pokemon_name_or_id):
+    try:
+        response = requests.get(f"{POKEDEX_API_URL}{pokemon_name_or_id}")
+        if response.status_code == 200:
+            data = response.json()
+            
+            # Szukamy wpisu w Pokédexie w języku angielskim
+            for entry in data["flavor_text_entries"]:
+                if entry["language"]["name"] == "en":  # Pobieramy tylko wpisy po angielsku
+                    return entry["flavor_text"]
+            return "Brak wpisu w języku angielskim."
+        else:
+            return "Nie znaleziono takiego Pokémona."
+    except Exception as e:
+        return f"Błąd podczas pobierania wpisu: {e}"
+
+# Komenda '!pokedex', która wysyła wpis z Pokédexu o wybranym Pokémonie
+@bot.command()
+async def pokedex(ctx, pokemon_name: str = None):
+    if pokemon_name is None:
+        pokemon_id = random.randint(1, 1010)
+        pokemon_name_or_id = pokemon_id
+    else:
+        pokemon_name_or_id = pokemon_name.lower()
+
+    pokedex_entry = get_pokedex_entry(pokemon_name_or_id)
+    await ctx.send(pokedex_entry)
+
+# Zdarzenie, które wywołuje się, gdy bot jest gotowy
+@bot.event
+async def on_ready():
+    print(f'Bot {bot.user} jest gotowy!')
+bot.run("")
